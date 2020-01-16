@@ -1,0 +1,532 @@
+---
+title: "Ocorrências criminais no Maranhão"
+author: "Francisco Jadson Brito de Oliveira"
+date: "08/10/2019"
+output:
+  html_document:
+    fig.align: center
+    fig_caption: true
+    fig_width: 10
+    highlight: haddock
+    number_sections: true
+    theme: readable
+    toc: true
+    toc_float: true
+  pdf_document:
+    fig_width: 10
+    number_sections: true
+    toc: true
+  word_document:
+    toc: true
+subtitle: uma análise dos dados Sistema Nacional de Informações de Segurança Pública,
+  Prisionais, de Rastreabilidade de Armas e Munições, de Material Genético, de Digitais
+  e de Drogas (Sinesp)
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Este artigo tem como objetivo descrever os crimes no Maranhão no período de janeiro de 2015 até maio de 2019 (último mês com dados disponíveis) por meio dos dados divulgados no Portal Brasileiro de Dados Abertos pelo Ministério da Justiça e Segurança Pública - MJ.
+
+Os dados podem ser acessados clicando [aqui](http://dados.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica)
+
+
+# Sobre os Dados
+
+
+## Histórico
+
+
+## Fonte de Dados e Indicadores
+
+> Os dados disponíveis foram extraídos das soluções SinespJC e Sinesp Integração, fontes primárias dos seguintes
+indicadores: Totais de Ocorrências e Totais de Vítimas de estupro, furto de veículos, homicídio doloso, lesão corporal
+seguida de morte, roubo à instituição financeira, roubo de carga, roubo de veículos e roubo seguido de morte.
+>
+> MINISTÉRIO DA JUSTIÇA SEGURANÇA PÚBLICA
+
+## Indicadores
+
+* **Estupro:** agressão sexual geralmente envolvendo relação sexual ou outras formas de atos libidinosos realizados contra uma pessoa sem o seu consentimento.
+
+* **Furto de veículo:** subtração sem violência ou grave ameaça de veículo automotor.
+
+* **Homicídio Doloso:**
+a) morte de alguém em que há indício de crime ou sina de agressão externa, exceto "Feminicídio", "Lesão Corporal Seguida de Morte", "Roubo Seguido de Morte (Latrocínio)" e crimes culposos; 
+b) morte violenta provocada por acidente de trânsito desde que haja dolo, e; 
+c) morte com indício de crime ou sinal de agressão externa qualificada como "encontro de ossada", "encontro de cadáver", "morte a esclarecer", "morte suspeita", "morte por causa desconhecida" e congêneres deverá ser classificada como Homicídio.
+
+* **Lesão corporal seguida de morte:** ofensa a integridade corporal de outrem que tenha por resultado a morte, nos termos do art. 129, § 3º do Código Penal.
+
+* **Roubo a instituição financeira:** subtração de carga com violência ou grave ameaça.
+
+* **Roubo de carga:** subtração de carga com violência ou grave ameaça.
+
+* **Roubo de veículo:** subtração, com violência ou grave ameaça de veículo automotor.
+
+* **Roubo seguido de morte:** roubo seguido de morte onde se caracteriza a subtração de coisa móvel alheia para si ou para outrem, mediante violência a pessoa, ou depois de havê-la, por qualquer meio, reduzido a impossibilidade de resistência, que tenha por resultado morte, nos ternos do art. 157, § 3º, II do Código Penal
+
+
+### Unidades de Medidas
+
+* **Ocorrências:** número de ocorrências registradas.
+
+* **Vítimas:** número de pessoas registradas como vítimas em uma ocorrência.
+
+
+## Nota
+
+> 
+1. Os dados registrados em data anterior a publicação da Portaria nº 229, de 10 de dezembro de 2018, não seguem a padronização contida no citado documento.
+2. É importante ressaltar que as informações apresentadas refletem o nível de alimentação e consolidação de cada
+Unidade da Federação no SinespJC e Sinesp Integração na data de sua extração, podendo ocorrer atualizações
+posteriores à publicação.
+>
+> MINISTÉRIO DA JUSTIÇA SEGURANÇA PÚBLICA
+
+ 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(ggrepel)
+library(gridExtra)
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Carregando os dados e fazendo algumas alterações
+
+## Ocorrencias
+ma_ocorrencias <- read_xlsx("ma---dadospublicos.xlsx", sheet = 1)
+
+nomes_colunas_ocorr <- c("UF", "tipo_crime", "mes_ano", "q_ocorr_PC_sinespJC", "q_ocorr_PC_sinesAnalise", "q_ocorr_MJ")
+colnames(ma_ocorrencias) <- nomes_colunas_ocorr
+
+ma_ocorrencias <- ma_ocorrencias %>% 
+  separate(mes_ano, c("mes", "ano"))
+
+## Vitimas
+ma_vitimas <- read_xlsx("ma---dadospublicos.xlsx", sheet = 2)
+
+nomes_colunas_vit <- c("UF", "tipo_crime", "mes_ano", "sexo" ,"q_ocorr_PC_sinespJC", "q_ocorr_PC_sinesAnalise", "q_ocorr_MJ")
+colnames(ma_vitimas) <- nomes_colunas_vit
+
+ma_vitimas <- ma_vitimas %>% 
+  separate(mes_ano, c("mes", "ano"))
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ma_ocorrencias_2018 <-
+  ma_ocorrencias %>% 
+  filter(ano == "2018")
+
+soma_ocorrencias_2018 <-
+  ma_ocorrencias_2018 %>% 
+  group_by(tipo_crime) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+ma_ocorrencias_2019 <-
+  ma_ocorrencias %>% 
+  filter(ano == "2019")
+
+soma_ocorrencias_2019 <-
+  ma_ocorrencias_2019 %>% 
+  group_by(tipo_crime) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+```
+
+
+
+
+# Ocorrências
+
+No Maranhão, em 2018, foram registradas `r format(sum(soma_ocorrencias_2018[ , "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências de crimes. Dos crimes analisados, o crime com maior quantidade de ocorrências é **`r as.character(soma_ocorrencias_2018[1, "tipo_crime"])`**, foram `r format(as.integer(soma_ocorrencias_2018[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ou `r paste(format(as.double(soma_ocorrencias_2018[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, o segundo tipo de crime com maior quantidade de ocorrências foi **`r as.character(soma_ocorrencias_2018[2, "tipo_crime"])`** (`r format(as.integer(soma_ocorrencias_2018[2, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2018[2 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`). No terceiro lugar, aparece **`r as.character(soma_ocorrencias_2018[3, "tipo_crime"])`** com `r format(as.integer(soma_ocorrencias_2018[3, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2018[3 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, o crime de **`r as.character(soma_ocorrencias_2018[4, "tipo_crime"])`**, fica na quarta posição com `r format(as.integer(soma_ocorrencias_2018[4, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2018[4 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`. Fechando o ranking 5, o crime de **`r as.character(soma_ocorrencias_2018[5, "tipo_crime"])`** com `r format(as.integer(soma_ocorrencias_2018[5, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2018[5 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, conforme o gráfico 1.
+
+ 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ma_ocorrencias %>% 
+  filter(ano == "2018") %>%
+  select(tipo_crime, q_ocorr_MJ) %>%
+  group_by(tipo_crime) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>%
+  mutate(tipo_crime = reorder(tipo_crime, total_ocorr)) %>%
+  ggplot(aes(x = tipo_crime, y = total_ocorr)) +
+  geom_col(fill = "lightpink3") +
+  coord_flip() +
+  geom_text(aes(label = total_ocorr), color = "black", size = 4) +
+  theme_clean() +
+  theme(plot.title = element_text(hjust =0),
+        panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Tipo de crime") +
+  ylab("Total de ocorrências") +
+  labs(title = "Gráfico 1 - Quantidade de ocorrências por tipo de crime no Maranhão em 2018",
+      #subtitle = "Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+```
+
+Em 2019, até o mês de maio, foram registradas `r format(sum(soma_ocorrencias_2019[ , "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências de crimes. Dos crimes analisados, o crime com maior quantidade de ocorrências é **`r as.character(soma_ocorrencias_2019[1, "tipo_crime"])`**, foram `r format(as.integer(soma_ocorrencias_2019[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ou `r paste(format(as.double(soma_ocorrencias_2019[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, o segundo tipo de crime com maior quantidade de ocorrências foi **`r as.character(soma_ocorrencias_2019[2, "tipo_crime"])`** (`r format(as.integer(soma_ocorrencias_2019[2, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2019[2 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`). No terceiro lugar, aparece **`r as.character(soma_ocorrencias_2019[3, "tipo_crime"])`** com `r format(as.integer(soma_ocorrencias_2019[3, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2019[3 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, o crime de **`r as.character(soma_ocorrencias_2019[4, "tipo_crime"])`**, fica na quarta posição com `r format(as.integer(soma_ocorrencias_2019[4, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2019[4 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`. Fechando o ranking 5, o crime de **`r as.character(soma_ocorrencias_2019[5, "tipo_crime"])`** com `r format(as.integer(soma_ocorrencias_2019[5, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` ocorrências registradas ou `r paste(format(as.double(soma_ocorrencias_2019[5 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, conforme o gráfico 2.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+ma_ocorrencias %>% 
+  filter(ano == "2019") %>%
+  select(tipo_crime, q_ocorr_MJ) %>%
+  group_by(tipo_crime) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>%
+  mutate(tipo_crime = reorder(tipo_crime, total_ocorr)) %>%
+  ggplot(aes(x = tipo_crime, y = total_ocorr)) +
+  geom_col(fill = "lightpink3") +
+  coord_flip() +
+  geom_text(aes(label = total_ocorr), color = "black", size = 4) +
+  theme_clean() +
+  theme(plot.title = element_text(hjust = 0),
+        plot.subtitle = element_text(hjust = 0),
+        panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Tipo de crime") +
+  ylab("Total de ocorrências") +
+  labs(title = "Gráfico 2 - Quantidade de ocorrências por tipo de crime no Maranhão em 2019",
+      subtitle = "Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+```
+
+
+
+# Estupro
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ano <- ma_ocorrencias %>% 
+  filter(tipo_crime == "Estupro") %>% 
+  group_by(ano) %>% 
+  summarise(total = sum(q_ocorr_MJ))
+
+mes <- ma_ocorrencias %>% 
+  filter(tipo_crime == "Estupro") %>% 
+  group_by(mes) %>% 
+  summarise(total = sum(q_ocorr_MJ)) %>% 
+  mutate(total = as.integer(total)) 
+
+maio <- ma_ocorrencias %>% 
+  filter(tipo_crime == "Estupro" & mes == "05") %>% 
+  group_by(ano) %>% 
+  summarise(total = sum(q_ocorr_MJ))
+
+estupro <-
+  ma_ocorrencias %>% 
+  filter(tipo_crime == "Estupro")
+```
+
+No acumulado, a quantidade de ocorrências de estupro, em 2015, no Maranhão foi de `r format(as.double(ano[1, "total"]), big.mark = ".", decimal.mark = ",")`, no ano seguinte a quantidade de ocorrências desse tipo de crime subiu para `r format(as.double(ano[2, "total"]), big.mark = ".", decimal.mark = ",")`, um aumento de `r paste(format(as.double((ano[2, "total"]/ano[1, "total"] - 1) * 100), big.mark = ".", decimal.mark = ",", digits = 3), "%", sep = "")`. Em 2017, houve o maior aumento do período em relação ao ano anterior, `r paste(format(as.double((ano[3, "total"]/ano[2, "total"] - 1) * 100), big.mark = ".", decimal.mark = ",", digits = 4), "%", sep = "")`, alcançando a marca de `r format(as.double(ano[3, "total"]), big.mark = ".", decimal.mark = ",", digits = 4)`. No ano seguinte, houve uma pequena redução (`r paste(format(as.double((ano[4, "total"]/ano[3, "total"] - 1) * 100), big.mark = ".", decimal.mark = ",", digits = 3), "%", sep = "")`, ou seja, `r format(as.double(ano[3, "total"]), big.mark = ".", decimal.mark = ",", digits = 3)` ocorrências). Para 2019, há disponibilidade de dados até o mês de maio, até esse mês, foram registradas `r format(as.double(ano[5, "total"]), big.mark = ".", decimal.mark = ",", digits = 4)` de estupro no estado (mês que mais ocorreu estupro foi maio, foram `r format(as.double(mes[5, "total"]), big.mark = ".", decimal.mark = ",", digits = 4)` casos).
+Maio de 2019 foi o mês com maior ocorrências de estupro `r format(as.double(ano[5, "total"]), big.mark = ".", decimal.mark = ",", digits = 4)`. 
+
+Do período analisado, o mês com mais vítimas de  **Estupro** foi maio de 2019 (último mês da série) com `r format(max(estupro$q_ocorr_MJ), big.mark = ".", decimal.mark = ",")`, em média,  `r format(round(mean(estupro$q_ocorr_MJ), 2), big.mark = ".", decimal.mark = ",")` pessoas são vítimas de Estupro por mês no estado.
+Analisando a série temporal, percebe-se que houve um aumento da quantidade de ocorrências desse tipo de crime com o decorrer do tempo, como mostra a linha azul no gráfico 3.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+a2018 <- ma_ocorrencias %>%
+  filter(tipo_crime == "Estupro" & ano == "2018") %>%
+  select(tipo_crime, q_ocorr_MJ) %>% 
+  rename(total = q_ocorr_MJ)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ma_ocorrencias %>%
+  mutate(data = as.Date(ISOdate(year = ano, month = mes, day = 1))) %>%
+  filter(tipo_crime == "Estupro") %>%
+  select(tipo_crime, q_ocorr_MJ, data) %>%
+  group_by(data) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>%
+  ggplot(aes(x = data, y = total_ocorr)) +
+  geom_line() +
+  geom_point(size = 1.8) +
+  geom_smooth(se = FALSE, method = loess) +
+  geom_text_repel(aes(label = total_ocorr), color = "violetred4", size = 3.5) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%b/%Y") +
+  theme_clean() +
+  theme(title = element_text(size = 10),
+        panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Ano") +
+  ylab("Quantidade de ocorrências") +
+  labs(title = "Gráfico 3 - Quantidade de ocorrências estupro no Maranhão (2015-2019*)",
+       subtitle = "*Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+
+```
+
+Em 2018, houve um pico de casos de estupro nos meses de agosto, setembro e outubro, apenas esses três meses aconteceram `r format(as.double(sum(a2018[8:10, "total"]), big.mark = ".", decimal.mark = ",", digits = 4))` ocorrências desse tipo de crime, ou seja, `r paste(format(as.double(sum(a2018[8:10, "total"])/sum(a2018[ , "total"]) * 100), big.mark = ".", decimal.mark = ",", digits = 4), "%", sep = "")` dos casos no ano, conforme o gráfico 4.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Estupro 2018
+ma_ocorrencias %>%
+  mutate(data = as.Date(ISOdate(year = ano, month = mes, day = 1))) %>%
+  filter(tipo_crime == "Estupro", ano == "2018") %>%
+  select(q_ocorr_MJ, data) %>%
+  ggplot(aes(x = data, y = q_ocorr_MJ)) +
+  geom_line() +
+  geom_point(size = 2) +
+  geom_smooth(se = FALSE, method = loess) +
+  geom_text_repel(aes(label = q_ocorr_MJ), color = "violetred4", size = 4) +
+  scale_x_date(date_breaks = "1 month",
+               date_labels = "%b") +
+  theme_clean() +
+  theme(panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Mes") +
+  ylab("Total de ocorrências") +
+  labs(title = "Gráfico 4 - Quantidade de ocorrências de estupro no Maranhão em 2018",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+```
+
+
+
+
+# Vítimas
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+vitimas_2018_sexo <- 
+  ma_vitimas %>% 
+  filter(ano == "2018") %>% 
+  group_by(sexo) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+vitimas_2018_h_crime <- 
+  ma_vitimas %>% 
+  filter(ano == "2018" & sexo == "Masculino") %>% 
+  group_by(tipo_crime) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+vitimas_2018_m_crime <- 
+  ma_vitimas %>% 
+  filter(ano == "2018" & sexo == "Feminino") %>% 
+  group_by(tipo_crime) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+vitimas_2019_sexo <- 
+  ma_vitimas %>% 
+  filter(ano == "2019") %>% 
+  group_by(sexo) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+vitimas_2019_h_crime <- 
+  ma_vitimas %>% 
+  filter(ano == "2019" & sexo == "Masculino") %>% 
+  group_by(tipo_crime) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+
+vitimas_2019_m_crime <- 
+  ma_vitimas %>% 
+  filter(ano == "2019" & sexo == "Feminino") %>% 
+  group_by(tipo_crime) %>% 
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>% 
+  mutate(percentual = round(total_ocorr / sum(total_ocorr) * 100, 2)) %>% 
+  arrange(desc(percentual))
+```
+
+
+Analisando as ocorrências de crimes por sexo no ano 2018, percebe-se que os **homens** são as principais vítimas, eles foram vítimas em `r format(as.integer(vitimas_2018_sexo[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` das ocorrências,  ou seja, `r paste(format(as.double(vitimas_2018_sexo[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")` dos casos. Por outro lado, as **mulheres** foram vítimas em `r format(as.integer(vitimas_2018_sexo[2, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` das ocorrências,  ou seja, `r paste(format(as.double(vitimas_2018_sexo[2 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`. 
+
+Dos crimes analisados, o crime com maior quantidade de vítimas, em ambos os sexos, foi Homicídio doloso. No caso das mulheres, houve `r format(as.integer(vitimas_2018_m_crime[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` vítimas desse tipo de crime,  ou seja, `r paste(format(as.double(vitimas_2018_m_crime[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`. No caso dos homens, o Homicídio doloso também foi o crime com maior quantidade de vítimas `r format(as.integer(vitimas_2018_h_crime[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` vítimas desse tipo de crime,  ou seja, `r paste(format(as.double(vitimas_2018_h_crime[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, conforme o gráfico 5.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Sexo e tipo de crime 2018
+g <- ma_vitimas %>% 
+  filter(ano == "2018", sexo != "Sexo NI") %>%
+  select(tipo_crime, q_ocorr_MJ, sexo) %>%
+  group_by(sexo, tipo_crime) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>%
+  mutate(tipo_crime = reorder(tipo_crime, total_ocorr)) %>%
+  ggplot(aes(x = tipo_crime, y = total_ocorr, fill = tipo_crime)) +
+  geom_col(show.legend = F) +
+  coord_flip() +
+  geom_text(aes(label = total_ocorr), color = "black", size = 4) +
+  theme_clean() +
+  theme(plot.title = element_text(hjust = 0),
+        panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Tipo de crime") +
+  ylab("Total de ocorrências") +
+  labs(title = "Gráfico  5 - Quantidade de ocorrências por tipo de crime e sexo no Maranhão\nem 2018",
+       #subtitle = "Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados") +
+  facet_wrap(~ sexo, ncol = 1, as.table = T)
+
+g + scale_fill_brewer(palette="RdPu", type = "qual", aesthetics = "fill")
+```
+
+Em 2019, analisando as ocorrências de crimes por sexo, percebe-se que os **homens** são as principais vítimas, eles foram vítimas em `r format(as.integer(vitimas_2019_sexo[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` das ocorrências,  ou seja, `r paste(format(as.double(vitimas_2019_sexo[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")` dos casos. Por outro lado, as **mulheres** foram vítimas em `r format(as.integer(vitimas_2019_sexo[2, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` das ocorrências,  ou seja, `r paste(format(as.double(vitimas_2019_sexo[2 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`. 
+
+Dos crimes analisados, o crime com maior quantidade de vítimas, em ambos os sexos, foi Homicídio doloso. No caso das mulheres, houve `r format(as.integer(vitimas_2019_m_crime[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` vítimas desse tipo de crime,  ou seja, `r paste(format(as.double(vitimas_2019_m_crime[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`. No caso dos homens, o Homicídio doloso também foi o crime com maior quantidade de vítimas `r format(as.integer(vitimas_2019_h_crime[1, "total_ocorr"]), big.mark = ".", decimal.mark = ",")` vítimas desse tipo de crime,  ou seja, `r paste(format(as.double(vitimas_2019_h_crime[1 , "percentual"]), big.mark = ".", decimal.mark = ","), "%", sep = "")`, conforme o gráfico 6.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Sexo e tipo de crime 2019
+g_estupro_ano <- ma_vitimas %>% 
+  filter(ano == "2019", sexo != "Sexo NI" & sexo != "Não informado") %>%
+  select(tipo_crime, q_ocorr_MJ, sexo) %>%
+  group_by(sexo, tipo_crime) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ)) %>%
+  mutate(tipo_crime = reorder(tipo_crime, total_ocorr)) %>%
+  ggplot(aes(x = tipo_crime, y = total_ocorr,  fill = tipo_crime)) +
+  geom_col(show.legend = F) +
+  coord_flip() +
+  geom_text(aes(label = total_ocorr), color = "black", size = 4) +
+  theme_clean() +
+  theme(plot.title = element_text(hjust = 0),
+        panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Tipo de crime") +
+  ylab("Total de ocorrências") +
+  labs(title = "Gráfico  6 - Quantidade de ocorrências por tipo de crime e sexo no Maranhão\nem 2019",
+       #subtitle = "Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados") +
+  facet_wrap(~ sexo, ncol = 1, as.table = T)
+
+g_estupro_ano + scale_fill_brewer(palette="RdPu")
+
+```
+
+
+## Homicídio doloso
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+homicidio_doloso <- 
+  ma_vitimas %>%
+  mutate(data = as.Date(ISOdate(year = ano, month = mes, day = 1))) %>%
+  filter(tipo_crime == "Homicídio doloso") %>%
+  select(tipo_crime, q_ocorr_MJ, data) %>%
+  group_by(data) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ))
+
+```
+
+Do período analisado, o mês com mais vítimas de  **Homicídio doloso** foi janeiro de 2016 com `r format(max(homicidio_doloso$total_ocorr), big.mark = ".", decimal.mark = ",")`, em média,  `r format(round(mean(homicidio_doloso$total_ocorr), 2), big.mark = ".", decimal.mark = ",")` pessoas são vítimas de homicídio doloso por mês no estado.
+Analisando a série temporal, percebe-se que houve uma redução da quantidade de vítimas desse tipo de crime com o decorrer do tempo, como mostra a linha azul no gráfico 7.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+homicidio_doloso %>% 
+  ggplot(aes(x = data, y = total_ocorr)) +
+  geom_line() +
+  geom_point(size = 1.8) +
+  geom_smooth(se = FALSE, method = loess) +
+  geom_text_repel(aes(label = total_ocorr), color = "violetred4", size = 3.5) +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%b/%Y") +
+  theme_clean() +
+  theme(panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+       #axis.text.x = element_text(angle = 90)) +
+  xlab("Meses") +
+  ylab("Quantidade de ocorrências") +
+  labs(title = "Gráfico  7 - Quantidade de vítimas de Homicídio doloso no Maranhão (2015-2019*)",
+       subtitle = "*Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+
+```
+
+
+
+
+## Lesão corporal seguida de morte
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+lesao_corporal <- 
+  ma_vitimas %>%
+  mutate(data = as.Date(ISOdate(year = ano, month = mes, day = 1))) %>%
+  filter(tipo_crime == "Lesão corporal seguida de morte") %>%
+  select(tipo_crime, q_ocorr_MJ, data) %>%
+  group_by(data) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ))
+```
+
+
+Do período analisado, o mês com mais vítimas de  **Lesão corporal seguida de morte** foi agosto de 2015 com `r format(max(lesao_corporal$total_ocorr), big.mark = ".", decimal.mark = ",")`, em média,  `r format(round(mean(lesao_corporal$total_ocorr), 2), big.mark = ".", decimal.mark = ",")` pessoas são vítimas de Lesão corporal seguida de morte por mês no estado.
+Analisando a série temporal, percebe-se que houve uma redução da quantidade de vítimas desse tipo de crime com o decorrer do tempo, como mostra a linha azul no gráfico 8.
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+lesao_corporal %>%
+  ggplot(aes(x = data, y = total_ocorr)) +
+  geom_line() +
+  geom_point(size = 1.8) +
+  geom_smooth(se = FALSE, method = loess) +
+  geom_text_repel(aes(label = total_ocorr), color = "violetred4", size = 3.5) +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%b/%Y") +
+  theme_clean() +
+  theme(panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Meses") +
+  ylab("Quantidade de ocorrências") +
+  labs(title = "Gráfico  8 - Quantidade de vítimas de Lesão corporal seguida de morte no Maranhão (2015-2019*)",
+       subtitle = "*Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+```
+
+
+## Roubo seguido de morte (latrocínio)
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+latrocinio <- 
+  ma_vitimas %>%
+  mutate(data = as.Date(ISOdate(year = ano, month = mes, day = 1))) %>%
+  filter(tipo_crime == "Lesão corporal seguida de morte") %>%
+  select(tipo_crime, q_ocorr_MJ, data) %>%
+  group_by(data) %>%
+  summarise(total_ocorr = sum(q_ocorr_MJ))
+```
+
+
+Do período analisado, o mês com mais vítimas de  **latrocínio** foi agosto de 2015 com `r format(max(latrocinio$total_ocorr), big.mark = ".", decimal.mark = ",")`, em média,  `r format(round(mean(latrocinio$total_ocorr), 2), big.mark = ".", decimal.mark = ",")` pessoas são vítimas de latrocínio por mês no estado.
+Analisando a série temporal, percebe-se que houve uma redução da quantidade de vítimas desse tipo de crime com o decorrer do tempo, como mostra a linha azul no gráfico 9.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+latrocinio %>%
+  ggplot(aes(x = data, y = total_ocorr)) +
+  geom_line() +
+  geom_point(size = 1.8) +
+  geom_smooth(se = FALSE, method = loess) +
+  geom_text_repel(aes(label = total_ocorr), color = "violetred4", size = 3.5) +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%b/%Y") +
+  theme_clean() +
+  theme(panel.grid.major.x  = element_line(color = "black", linetype = 3)) +
+  xlab("Meses") +
+  ylab("Quantidade de ocorrências") +
+  labs(title = "Gráfico 9 - Quantidade de vítimas de Roubo seguido de morte (latrocínio) (2015-2019*)",
+       subtitle = "*Até o mês de maio",
+       caption = "Fonte: Ministerio da Justiça Elaborado por: Maranhão em Dados")
+```
+
+REFERÊNCIAS
+
+DICIONARIO DE DADOS
+
+Ocorrências Criminais - Sistema Sinesp
